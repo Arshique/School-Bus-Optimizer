@@ -4,7 +4,7 @@ USE SchlDb;
 CREATE TABLE Admin(
     Adm_Id varchar(7) PRIMARY KEY,
     Adm_username varchar(20) UNIQUE,
-    Adm_pass varchar(25) NOT NULL,
+    Adm_passw varchar(25) NOT NULL,
     Adm_role ENUM('Admin','Staff','Driver')
 );
 
