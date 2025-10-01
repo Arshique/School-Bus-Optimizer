@@ -28,8 +28,10 @@ def logintodb(user, passw):
         result = cursor.fetchone()
         if result:
             messagebox.showinfo("Login Successful", f"Welcome, {user}!")
+            return True
         else:
             messagebox.showerror("Login Failed", "Invalid username or password")
+            return False
     except mysql.connector.Error as err:
         messagebox.showerror("Query Error", f"Database query failed:\n{err}")
     finally:
@@ -39,10 +41,12 @@ def logintodb(user, passw):
 def submitact(Username, password):
     user = Username.get()
     passw = password.get()
-    print(f"The name entered by you is {user} {passw}")
-    logintodb(user, passw)
+    print(f"The name entered by you is {user} and password = {passw}")
+    if logintodb(user, passw):
+        adm_dashboard(user)
 #----------- GUI Setup ----------
 def main():
+    global root
     root = tk.Tk()
     root.geometry("500x400")
     root.title("Login Page - Route Wizard v1.0")
@@ -50,7 +54,7 @@ def main():
     root.resizable(False, False)
 
     frame = tk.Frame(root,bg="#121212")
-    frame .place(relx =0.5, rely =0.5, anchor = "center")
+    frame.place(relx =0.5, rely =0.5, anchor = "center")
 
     head = tk.Label(root, text ="Login to Route Wizard",fg="#3a7ca5",bg="#121212", font=("Arial", 20 ,"bold"))
     head.place(relx=0.5, y= 30,anchor="n")
@@ -71,4 +75,40 @@ def main():
     submitbtn.pack(pady =10, ipadx = 10, ipady = 2)
 
     root.mainloop()
+
+def adm_dashboard(user):
+    root.destroy()
+
+    dashboard = tk.Tk()
+    dashboard.title("Admin Dashboard")
+    dashboard.geometry("600x400")
+    dashboard.configure(bg="#121212")
+    # dashboard.resizable(False, False)
+
+    head = tk.Label(dashboard, text=f"Welcome {user}", fg="#3a7ca5", bg="#121212", font=("Arial", 20, "bold"))
+    head.place(relx=0.5, y=30, anchor="n")
+
+    frame = tk.Frame(dashboard,bg="#121212")
+    frame.place(relx =0.5, rely =0.5, anchor = "center")
+
+    School_btn = tk.Button(frame, text="School Management", bg='#3a7ca5', font=("Arial", 14), fg="white")   
+    School_btn.grid(row=0, column=0, padx=20, pady=20)
+
+    bus_btn = tk.Button(frame, text="Bus Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
+    bus_btn.grid(row=0, column=1, padx=20, pady=20)
+
+    driver_btn = tk.Button(frame, text="Driver Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
+    driver_btn.grid(row=0, column=2, padx=20, pady=20)
+
+    route_btn = tk.Button(frame, text="Route Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
+    route_btn.grid(row=1, column=0, padx=20, pady=20)
+
+    stop_btn = tk.Button(frame, text="Stop Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
+    stop_btn.grid(row=1, column=1, padx=20, pady=20)
+
+    student_btn = tk.Button(frame, text="Student Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
+    student_btn.grid(row=1, column=2, padx=20, pady=20)
+
+    dashboard.mainloop()
 main()
+
