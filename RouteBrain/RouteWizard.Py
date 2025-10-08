@@ -1,13 +1,13 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk , messagebox
 import mysql.connector
 
 # ---------- Database Connection ----------
 def get_connection():
     return mysql.connector.connect(
         host="localhost",
-        user="root",         # change if needed
-        password="Bff=n&s<3", # your MySQL password
+        user="root",
+        password="Bff=n&s<3",
         database="SchlDb"
     )
 
@@ -19,6 +19,7 @@ def logintodb(user, passw):
 
     db = get_connection()
     if not db:
+        messagebox.showerror("Connection Error", "Failed to connect to the database")
         return
 
     try:
@@ -44,6 +45,70 @@ def submitact(Username, password):
     print(f"The name entered by you is {user} and password = {passw}")
     if logintodb(user, passw):
         adm_dashboard(user)
+
+def show_tables(table_name):
+    db = get_connection()
+    if not db:
+        print("Failed to connect to the database")
+        return
+
+    try:
+        right_buttons_dict = {
+        "School": ["Add School", "Edit School", "Delete School","Exit"],
+        "Student": ["Add Student", "Edit Student", "Delete Student","Exit"],
+        "Driver": ["Add Driver", "Edit Driver", "Remove Driver","Exit"],
+        "Bus": ["Add Bus", "Assign Route", "Delete Bus","Exit"],
+        "Route": ["Add Route", "Optimize Route", "Delete Route","Exit"],
+        "Stop": ["Add Stop", "Edit Stop", "Remove Stop","Exit"]
+        }
+
+        cursor = db.cursor()
+        cursor.execute(f"Describe {table_name}")
+
+        columns = [col[0] for col in cursor.fetchall()]
+
+        cursor.execute(f"SELECT * FROM {table_name}")
+        rows = cursor.fetchall()
+
+        for widget in frame2.winfo_children():
+            widget.destroy()
+
+        tree = ttk.Treeview(frame2, columns=columns, show='headings')
+        tree.pack(fill='both', expand=True)
+
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=len(col)*20, anchor='center')
+
+        for row in rows:
+            tree.insert('', 'end', values=row)    
+
+        for widget in right_frame.winfo_children():
+            widget.destroy()
+
+        buttons_to_add = right_buttons_dict.get(table_name, [])
+        for btn_text in buttons_to_add:
+            btn = tk.Button(right_frame, text=btn_text, bg="#3a7ca5", fg="white", width=20)
+            btn.pack(pady=5, fill="x")
+        
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        style.configure("Treeview", background="#1e1e1e", foreground="#b0b0b0", fieldbackground="#1e1e1e", font=("Arial", 12))
+
+        style.map("Treeview", background=[('selected', '#3a7ca5')], foreground=[('selected', 'white')])
+
+        style.configure("Treeview.Heading", background="#3a7ca5", foreground="white", font=("Arial", 12, "bold"))
+        style.map("Treeview.Heading", background=[('active', '#357ABD')])
+
+        tree.configure(style="Treeview")
+
+    except mysql.connector.Error as err:
+        print(f"Database query failed: {err}")
+
+    finally:
+        cursor.close()
+        db.close()
 #----------- GUI Setup ----------
 def main():
     global root
@@ -78,37 +143,49 @@ def main():
 
 def adm_dashboard(user):
     root.destroy()
+    global frame2 , right_frame
 
     dashboard = tk.Tk()
     dashboard.title("Admin Dashboard")
-    dashboard.geometry("600x400")
+    dashboard.geometry("1366x768")
     dashboard.configure(bg="#121212")
-    # dashboard.resizable(False, False)
 
     head = tk.Label(dashboard, text=f"Welcome {user}", fg="#3a7ca5", bg="#121212", font=("Arial", 20, "bold"))
-    head.place(relx=0.5, y=30, anchor="n")
+    head.pack(pady=20)
 
     frame = tk.Frame(dashboard,bg="#121212")
-    frame.place(relx =0.5, rely =0.5, anchor = "center")
+    frame.pack(pady=20)
 
-    School_btn = tk.Button(frame, text="School Management", bg='#3a7ca5', font=("Arial", 14), fg="white")   
-    School_btn.grid(row=0, column=0, padx=20, pady=20)
+    button_frame = tk.Frame(dashboard, bg="#121212")
+    button_frame.pack(pady=10)
 
-    bus_btn = tk.Button(frame, text="Bus Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
-    bus_btn.grid(row=0, column=1, padx=20, pady=20)
+    buttons = [
+    "School Management",
+    "Student Management",
+    "Driver Management",
+    "Bus Management",
+    "Route Management",
+    "Stop Management"
+    ]
 
-    driver_btn = tk.Button(frame, text="Driver Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
-    driver_btn.grid(row=0, column=2, padx=20, pady=20)
+    for i, text in enumerate(buttons):
+        btn = tk.Button(button_frame, text=text, bg="#3a7ca5", fg="white",
+                    font=("Arial", 14), width=20, command=lambda t=text: show_tables(t.split()[0]))
+        btn.grid(row=i//3, column=i%3, padx=50, pady=20)
 
-    route_btn = tk.Button(frame, text="Route Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
-    route_btn.grid(row=1, column=0, padx=20, pady=20)
+    content_frame = tk.Frame(dashboard, bg="#121212")
+    content_frame.pack(fill="both", expand=True, padx=20, pady=20)
 
-    stop_btn = tk.Button(frame, text="Stop Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
-    stop_btn.grid(row=1, column=1, padx=20, pady=20)
+    center_frame = tk.Frame(content_frame, bg="#1e1e1e")
+    center_frame.pack()
 
-    student_btn = tk.Button(frame, text="Student Management", bg='#3a7ca5', font=("Arial", 14), fg="white")
-    student_btn.grid(row=1, column=2, padx=20, pady=20)
+    frame2 = tk.Frame(center_frame, bg="#1e1e1e", width=700, height=400)
+    frame2.pack(side="left", padx=(0, 20), pady=10)
+
+    right_frame = tk.Frame(center_frame, bg="#1e1e1e")
+    right_frame.pack(side="left", pady=10, anchor="n")
 
     dashboard.mainloop()
+
 main()
 
