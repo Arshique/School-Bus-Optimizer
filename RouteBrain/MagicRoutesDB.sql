@@ -2,7 +2,7 @@ CREATE DATABASE SchlDb;
 USE SchlDb;
 
 CREATE TABLE Admin(
-    Adm_Id varchar(7) PRIMARY KEY,
+    Adm_Id INT PRIMARY KEY Auto_Increment,
     Adm_username varchar(20) UNIQUE,
     Adm_passw varchar(25) NOT NULL,
     Adm_role ENUM('Admin','Staff','Driver')

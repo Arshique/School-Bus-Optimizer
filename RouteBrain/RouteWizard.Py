@@ -94,7 +94,7 @@ def show_tables(table_name):
 
         buttons_to_add = right_buttons_dict.get(table_name, [])
         for btn_text in buttons_to_add:
-            btn = tk.Button(right_frame, text=btn_text, bg="#3a7ca5", fg="white", width=20)
+            btn = tk.Button(right_frame, text=btn_text, bg="#3a7ca5", fg="white", width=20, command=lambda t=btn_text: handle_action(t, tree, table_name, columns))
             btn.pack(pady=5, fill="x")
         
         style = ttk.Style()
@@ -116,6 +116,138 @@ def show_tables(table_name):
     finally:
         cursor.close()
         db.close()
+
+# ---------- Inline Edit Function ----------
+def start_inline_edit(tree, rowid, col_index, table_name, columns, next_column=False):
+    """Inline edit for one cell and update DB"""
+    if col_index >= len(columns):
+        return
+
+    # skip primary key (col 0)
+    if col_index == 0:
+        if next_column:
+            return start_inline_edit(tree, rowid, 1, table_name, columns, next_column=True)
+        return
+
+    col_id = f"#{col_index+1}"
+    bbox = tree.bbox(rowid, col_id)
+    if not bbox:
+        return
+    x, y, width, height = bbox
+    old_value = tree.item(rowid, "values")[col_index]
+
+    entry = tk.Entry(tree, font=("Arial", 12))
+    entry.place(x=x, y=y, width=width, height=height)
+    entry.insert(0, old_value)
+    entry.focus()
+
+    def save_edit(event=None):
+        new_value = entry.get()
+        values = list(tree.item(rowid, "values"))
+        values[col_index] = new_value
+        tree.item(rowid, values=values)
+        entry.destroy()
+
+        pk_col = columns[0]
+        pk_val = values[0]
+
+        try:
+            db = get_connection()
+            cursor = db.cursor()
+            update_col = columns[col_index]
+            cursor.execute(f"UPDATE {table_name} SET {update_col}=%s WHERE {pk_col}=%s", (new_value, pk_val))
+            db.commit()
+            cursor.close()
+            db.close()
+        except Exception as e:
+            print("DB update failed:", e)
+
+        # Continue to next column if requested
+        if next_column and col_index + 1 < len(columns):
+            tree.after(50, lambda: start_inline_edit(tree, rowid, col_index + 1, table_name, columns, True))
+
+    entry.bind("<Return>", save_edit)
+    entry.bind("<FocusOut>", save_edit)
+
+
+
+# ---------- Handle Buttons Function ----------
+def handle_action(action, tree, table_name, columns):
+    sel = tree.selection()
+
+    # ---------- ADD ----------
+    if action.startswith("Add"):
+        try:
+            db = get_connection()
+            cursor = db.cursor()
+            cursor.execute(f"DESCRIBE {table_name}")
+            col_info = cursor.fetchall()
+
+            insert_cols, insert_values = [], []
+            for field, ftype, null, key, default, extra in col_info:
+                if "auto_increment" in extra.lower():
+                    continue
+                insert_cols.append(field)
+                if default is not None:
+                    insert_values.append(default)
+                elif "enum" in ftype.lower():
+                    first_val = ftype[ftype.find("(")+1:ftype.find(")")].split(",")[0].strip("'")
+                    insert_values.append(first_val)
+                elif "int" in ftype.lower():
+                    insert_values.append(0)
+                else:
+                    insert_values.append("")
+
+            placeholders = ", ".join(["%s"] * len(insert_values))
+            cursor.execute(f"INSERT INTO {table_name} ({', '.join(insert_cols)}) VALUES ({placeholders})", insert_values)
+            db.commit()
+
+            cursor.execute(f"SELECT * FROM {table_name} ORDER BY {col_info[0][0]} DESC LIMIT 1")
+            new_row = cursor.fetchone()
+            cursor.close()
+            db.close()
+
+            new_id = tree.insert('', 'end', values=new_row)
+            start_inline_edit(tree, new_id, 1, table_name, [c[0] for c in col_info], next_column=True)
+
+        except Exception as e:
+            print("Add failed:", e)
+
+    # ---------- EDIT ----------
+    elif action.startswith("Edit"):
+        if sel:
+            row_id = sel[0]
+            start_inline_edit(tree, row_id, 1, table_name, columns, next_column=True)
+        else:
+            messagebox.showwarning("Select row", "Please select a row to edit")
+
+    # ---------- DELETE / REMOVE ----------
+    elif action.startswith("Delete") or action.startswith("Remove"):
+        if sel:
+            values = tree.item(sel[0], "values")
+            pk_val = values[0]
+            try:
+                db = get_connection()
+                cursor = db.cursor()
+                query = f"DELETE FROM {table_name} WHERE {columns[0]}=%s"
+                cursor.execute(query, (pk_val,))
+                db.commit()
+                cursor.close()
+                db.close()
+                tree.delete(sel[0])
+            except Exception as e:
+                print("Delete failed:", e)
+        else:
+            messagebox.showwarning("Select row", "Please select a row to delete")
+
+    # ---------- EXIT ----------
+    elif action.startswith("Exit"):
+        for widget in frame2.winfo_children():
+            widget.destroy()
+        for widget in right_frame.winfo_children():
+            widget.destroy()
+
+
 #----------- GUI Setup ----------
 def main():
     global root
@@ -187,10 +319,10 @@ def adm_dashboard(user):
     center_frame.pack()
 
     frame2 = tk.Frame(center_frame, bg="#1e1e1e", width=700, height=400)
-    frame2.pack(side="left", padx=(20, 20), pady=10)
+    frame2.pack(side="left", padx=(20, 20), pady=20)
 
     right_frame = tk.Frame(center_frame, bg="#1e1e1e")
-    right_frame.pack(side="left", padx=(20, 20), pady=10, anchor="n")
+    right_frame.pack(side="left", padx=(20, 20), pady=20, anchor="n")
 
     dashboard.mainloop()
 
