@@ -54,7 +54,7 @@ def show_tables(table_name):
 
     try:
         right_buttons_dict = {
-        "School": ["Add School", "Edit School", "Delete School","Exit"],
+        "Admin": ["Add Admin", "Edit Admin", "Delete Admin","Exit"],
         "Student": ["Add Student", "Edit Student", "Delete Student","Exit"],
         "Driver": ["Add Driver", "Edit Driver", "Remove Driver","Exit"],
         "Bus": ["Add Bus", "Assign Route", "Delete Bus","Exit"],
@@ -73,8 +73,11 @@ def show_tables(table_name):
         for widget in frame2.winfo_children():
             widget.destroy()
 
-        tree = ttk.Treeview(frame2, columns=columns, show='headings')
-        tree.pack(fill='both', expand=True)
+        table_frame = tk.Frame(frame2, bg="#1e1e1e")
+        table_frame.pack(fill="both", expand=True)    
+
+        tree = ttk.Treeview(table_frame, columns=columns, show='headings')
+        tree.pack(side="left", fill='both', expand=True)
 
         for col in columns:
             tree.heading(col, text=col)
@@ -85,6 +88,9 @@ def show_tables(table_name):
 
         for widget in right_frame.winfo_children():
             widget.destroy()
+
+        vsb = ttk.Scrollbar(table_frame, orient="vertical", command=tree.yview)
+        vsb.pack(side='right', fill='y')
 
         buttons_to_add = right_buttons_dict.get(table_name, [])
         for btn_text in buttons_to_add:
@@ -101,8 +107,9 @@ def show_tables(table_name):
         style.configure("Treeview.Heading", background="#3a7ca5", foreground="white", font=("Arial", 12, "bold"))
         style.map("Treeview.Heading", background=[('active', '#357ABD')])
 
-        tree.configure(style="Treeview")
+        tree.configure(style="Treeview" , yscrollcommand=vsb.set)
 
+        
     except mysql.connector.Error as err:
         print(f"Database query failed: {err}")
 
@@ -160,7 +167,7 @@ def adm_dashboard(user):
     button_frame.pack(pady=10)
 
     buttons = [
-    "School Management",
+    "Admin Management",
     "Student Management",
     "Driver Management",
     "Bus Management",
@@ -180,10 +187,10 @@ def adm_dashboard(user):
     center_frame.pack()
 
     frame2 = tk.Frame(center_frame, bg="#1e1e1e", width=700, height=400)
-    frame2.pack(side="left", padx=(0, 20), pady=10)
+    frame2.pack(side="left", padx=(20, 20), pady=10)
 
     right_frame = tk.Frame(center_frame, bg="#1e1e1e")
-    right_frame.pack(side="left", pady=10, anchor="n")
+    right_frame.pack(side="left", padx=(20, 20), pady=10, anchor="n")
 
     dashboard.mainloop()
 
