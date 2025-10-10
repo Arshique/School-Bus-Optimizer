@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import ttk , messagebox
 import mysql.connector
+from tkinterweb import HtmlFrame
+import folium
+from io import BytesIO
 
 # ---------- Database Connection ----------
 def get_connection():
@@ -8,7 +11,7 @@ def get_connection():
         host="localhost",
         user="root",
         password="Bff=n&s<3",
-        database="SchlDb"
+        database="RouteDb"
     )
 
 # ---------- Functions ----------
@@ -57,8 +60,8 @@ def show_tables(table_name):
         "Admin": ["Add Admin", "Edit Admin", "Delete Admin","Exit"],
         "Student": ["Add Student", "Edit Student", "Delete Student","Exit"],
         "Driver": ["Add Driver", "Edit Driver", "Remove Driver","Exit"],
-        "Bus": ["Add Bus", "Assign Route", "Delete Bus","Exit"],
-        "Route": ["Add Route", "Optimize Route", "Delete Route","Exit"],
+        "Bus": ["Add Bus", "Edit Bus", "Assign Route", "Delete Bus","Exit"],
+        "Route": ["Add Route", "Edit Route", "Optimize Route", "Delete Route","Exit"],
         "Stop": ["Add Stop", "Edit Stop", "Remove Stop","Exit"]
         }
 
@@ -169,8 +172,6 @@ def start_inline_edit(tree, rowid, col_index, table_name, columns, next_column=F
     entry.bind("<Return>", save_edit)
     entry.bind("<FocusOut>", save_edit)
 
-
-
 # ---------- Handle Buttons Function ----------
 def handle_action(action, tree, table_name, columns):
     sel = tree.selection()
@@ -184,34 +185,83 @@ def handle_action(action, tree, table_name, columns):
             col_info = cursor.fetchall()
 
             insert_cols, insert_values = [], []
+
+            # --- Foreign key selection ---
+            fk_values = {}
             for field, ftype, null, key, default, extra in col_info:
                 if "auto_increment" in extra.lower():
                     continue
                 insert_cols.append(field)
-                if default is not None:
-                    insert_values.append(default)
+
+                # Foreign key detection (column name ends with 'Id' or 'id')
+                if "int" in ftype.lower() and ("id" in field.lower()):
+                    # find parent table
+                    ref_table_query = f"""
+                    SELECT REFERENCED_TABLE_NAME 
+                    FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{table_name}' AND COLUMN_NAME='{field}'
+                    """
+                    cursor.execute(ref_table_query)
+                    ref_table = cursor.fetchone()
+                    if ref_table:
+                        ref_table = ref_table[0]
+                        # fetch all IDs from parent table
+                        cursor.execute(f"SELECT {field} FROM {ref_table}")
+                        parent_ids = [str(r[0]) for r in cursor.fetchall()]
+                        # popup selection if parent_ids exist
+                        if parent_ids:
+                            sel_window = tk.Toplevel()
+                            sel_window.title(f"Select {field} for {table_name}")
+                            sel_window.geometry("250x100")
+                            tk.Label(sel_window, text=f"Select {field}").pack(pady=5)
+                            var = tk.StringVar(sel_window)
+                            var.set(parent_ids[0])
+                            dropdown = tk.OptionMenu(sel_window, var, *parent_ids)
+                            dropdown.pack(pady=5)
+
+                            # Wait for user selection
+                            sel_done = tk.BooleanVar()
+                            tk.Button(sel_window, text="OK", command=lambda: sel_done.set(True)).pack(pady=5)
+                            sel_window.wait_variable(sel_done)
+                            insert_values.append(int(var.get()))
+                            sel_window.destroy()
+                        else:
+                            # no parent rows yet, insert NULL
+                            insert_values.append(None)
+                    else:
+                        insert_values.append(None)
+
+                # ENUM type → pick first value
                 elif "enum" in ftype.lower():
                     first_val = ftype[ftype.find("(")+1:ftype.find(")")].split(",")[0].strip("'")
                     insert_values.append(first_val)
+
+                # INT → default 0
                 elif "int" in ftype.lower():
                     insert_values.append(0)
+
+                # VARCHAR / TEXT → empty string
                 else:
                     insert_values.append("")
 
+            # Insert into table
             placeholders = ", ".join(["%s"] * len(insert_values))
             cursor.execute(f"INSERT INTO {table_name} ({', '.join(insert_cols)}) VALUES ({placeholders})", insert_values)
             db.commit()
 
+            # Fetch new row for Treeview
             cursor.execute(f"SELECT * FROM {table_name} ORDER BY {col_info[0][0]} DESC LIMIT 1")
             new_row = cursor.fetchone()
             cursor.close()
             db.close()
 
+            # Add to Treeview and start inline edit
             new_id = tree.insert('', 'end', values=new_row)
             start_inline_edit(tree, new_id, 1, table_name, [c[0] for c in col_info], next_column=True)
 
         except Exception as e:
             print("Add failed:", e)
+
 
     # ---------- EDIT ----------
     elif action.startswith("Edit"):
@@ -246,6 +296,9 @@ def handle_action(action, tree, table_name, columns):
             widget.destroy()
         for widget in right_frame.winfo_children():
             widget.destroy()
+
+    elif action == "Assign Route":
+        messagebox.showinfo("Info", "Assign Route functionality is not yet implemented.")
 
 
 #----------- GUI Setup ----------
