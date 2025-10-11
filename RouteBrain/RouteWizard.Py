@@ -3,6 +3,7 @@ from tkinter import ttk , messagebox
 import mysql.connector
 import folium
 import webbrowser
+import math
 
 # ---------- Database Connection ----------
 def get_connection():
@@ -14,6 +15,19 @@ def get_connection():
     )
 
 # ---------- Functions ----------
+def distance(a, b):
+    lat1, lon1 = float(a[1]), float(a[2])
+    lat2, lon2 = float(b[1]), float(b[2])
+    return math.sqrt((lat1 - lat2)**2 + (lon1 - lon2)**2)
+
+def optimize_route(stops, school):
+    route, rem, cur = [school], stops.copy(), school
+    while rem:
+        nxt = min(rem, key=lambda s: distance(cur, s))
+        route.append(nxt); rem.remove(nxt); cur = nxt
+    route.append(school)
+    return route
+
 def logintodb(user, passw):
     if not user or not passw:
         messagebox.showwarning("Input Error", "Please enter both username and password")
@@ -102,11 +116,11 @@ def show_tables(table_name):
         style = ttk.Style()
         style.theme_use('clam')
 
-        style.configure("Treeview", background="#1e1e1e", foreground="#b0b0b0", fieldbackground="#1e1e1e", font=("Arial", 12))
+        style.configure("Treeview", background="#1e1e1e", foreground="#b0b0b0", fieldbackground="#1e1e1e", font=("Segoe UI", 12))
 
         style.map("Treeview", background=[('selected', '#3a7ca5')], foreground=[('selected', 'white')])
 
-        style.configure("Treeview.Heading", background="#3a7ca5", foreground="white", font=("Arial", 12, "bold"))
+        style.configure("Treeview.Heading", background="#3a7ca5", foreground="white", font=("Segoe UI", 12, "bold"))
         style.map("Treeview.Heading", background=[('active', '#357ABD')])
 
         tree.configure(style="Treeview" , yscrollcommand=vsb.set)
@@ -136,7 +150,7 @@ def start_inline_edit(tree, rowid, col_index, table_name, columns, next_column=F
     x, y, width, height = bbox
     old_value = tree.item(rowid, "values")[col_index]
 
-    entry = tk.Entry(tree, font=("Arial", 12))
+    entry = tk.Entry(tree, font=("Segoe UI", 12))
     entry.place(x=x, y=y, width=width, height=height)
     entry.insert(0, old_value)
     entry.focus()
@@ -279,28 +293,32 @@ def handle_action(action, tree, table_name, columns):
 
     elif action == "Assign Route":
         messagebox.showinfo("Info", "Assign Route functionality is not yet implemented.")
+
     elif action == "Optimize Route":
         try:
             db = get_connection()
             cursor = db.cursor()
 
-            query = "Select Stp_name, Latitude, Longitude from Stop"
-            cursor.execute(query)
-            stops = cursor.fetchall()
-            cursor.close()
-            db.close()
-
-            if stops:
-                first_lat, first_lon = stops[0][1], stops[0][2]
-                m = folium.Map(location=[first_lat, first_lon], zoom_start=12)
-            else:
-                messagebox.showwarning("No Stops", "No stops available to optimize route.")
-                return
-            for name, lat, lon in stops:
-                folium.Marker(location=[lat, lon], popup=name, icon = folium.Icon(color='blue', icon='info-sign')).add_to(m)
-
+            cursor.execute("Select Stp_name, Latitude, Longitude from Stop")
+            rows = cursor.fetchall()
+            stops = []
+            for name, lat, lon in rows:
+                try:
+                    stops.append((name, float(lat), float(lon)))
+                except ValueError:
+                    print(f"Skipping invalid coordinates for stop: {name}")
+            school= ("St.Arnold's School" , 22.2187296, 84.7791764)
+            optimized = optimize_route(stops, school)
+            m = folium.Map(location=[school[1], school[2]], zoom_start=13)
+            folium.PolyLine([(s[1], s[2]) for s in optimized], color="blue", weight=3).add_to(m)
+            for s in optimized:
+                folium.Marker([s[1], s[2]], tooltip=s[0]).add_to(m)
             m.save("optimized_route.html")
             webbrowser.open("optimized_route.html")
+            print("Optimized Route Order:") 
+            for s in optimized:
+                print(f" → {s[0]} ({s[1]}, {s[2]})")
+            messagebox.showinfo("Route Optimized", "Check terminal for stop order!")
             
         except Exception as e:
             messagebox.showwarning("Optimize Route failed:", e)
@@ -316,22 +334,22 @@ def main():
     frame = tk.Frame(root,bg="#121212")
     frame.place(relx =0.5, rely =0.5, anchor = "center")
 
-    head = tk.Label(root, text ="Login to Route Wizard",fg="#3a7ca5",bg="#121212", font=("Arial", 20 ,"bold"))
+    head = tk.Label(root, text ="Login to Route Wizard",fg="#3a7ca5",bg="#121212", font=("Segoe UI", 20 ,"bold"))
     head.place(relx=0.5, y= 30,anchor="n")
 
-    lblfrstrow = tk.Label(frame, text ="Username",fg="#e0e0e0",bg="#121212", font=("Arial", 14))
+    lblfrstrow = tk.Label(frame, text ="Username",fg="#e0e0e0",bg="#121212", font=("Segoe UI", 14))
     lblfrstrow.pack(pady=(0,5))
 
     Username = tk.Entry(frame, width = 35,bg="#1e1e1e",fg="#b0b0b0",justify="center")
     Username.pack(pady=(0,15), ipady = 5, ipadx = 10)
  
-    lblsecrow = tk.Label(frame, text ="Password",fg="#e0e0e0",bg="#121212",font=("Arial", 14))
+    lblsecrow = tk.Label(frame, text ="Password",fg="#e0e0e0",bg="#121212",font=("Segoe UI", 14))
     lblsecrow.pack(pady=(0,5))
 
     password = tk.Entry(frame, width = 35,bg="#1e1e1e",fg="#b0b0b0",show="*",justify="center")
     password.pack(pady=(0,15), ipady = 5, ipadx = 10)
 
-    submitbtn = tk.Button(frame, text ="Login", bg ='#3a7ca5',font=("Arial", 14),fg="white" ,command =lambda: submitact(Username , password))
+    submitbtn = tk.Button(frame, text ="Login", bg ='#3a7ca5',font=("Segoe UI", 14),fg="white" ,command =lambda: submitact(Username , password))
     submitbtn.pack(pady =10, ipadx = 10, ipady = 2)
 
     root.mainloop()
@@ -345,7 +363,7 @@ def adm_dashboard(user):
     dashboard.geometry("1366x768")
     dashboard.configure(bg="#121212")
 
-    head = tk.Label(dashboard, text=f"Welcome {user}", fg="#3a7ca5", bg="#121212", font=("Arial", 20, "bold"))
+    head = tk.Label(dashboard, text=f"Welcome {user}!!", fg="#3a7ca5", bg="#121212", font=("Segoe UI", 20, "bold"))
     head.pack(pady=20)
 
     frame = tk.Frame(dashboard,bg="#121212")
@@ -365,7 +383,7 @@ def adm_dashboard(user):
 
     for i, text in enumerate(buttons):
         btn = tk.Button(button_frame, text=text, bg="#3a7ca5", fg="white",
-                    font=("Arial", 14), width=20, command=lambda t=text: show_tables(t.split()[0]))
+                    font=("Segoe UI", 14), width=20, command=lambda t=text: show_tables(t.split()[0]))
         btn.grid(row=i//3, column=i%3, padx=50, pady=20)
 
     content_frame = tk.Frame(dashboard, bg="#121212")
