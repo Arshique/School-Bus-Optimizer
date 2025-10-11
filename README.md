@@ -92,7 +92,14 @@ SchoolBusOptimizer/
 
 **Dashboard:**
 
-![Dashboard](output/Dashboard_without_button_click.jpg)
+ * Dashboard when we enter.
+   ![Dashboard](output/Dashboard_without_button_click.jpg)
+
+ * Dashboard displaying table from database.
+   ![Dashboard](output/dashboard_with_table.jpg)
+
+ * dahboard while editing table.
+   ![Dashboard](output/Dashboar_while_editing.jpg)
 
 **Optimized Route Map:**
 
