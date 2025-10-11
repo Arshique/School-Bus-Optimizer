@@ -88,15 +88,15 @@ SchoolBusOptimizer/
 
 **Login Page:**
 
-![Login Page](C:\Users\alama\OneDrive\Pictures\school_bus_optmiser\login_page)
+![Login Page](output/login_page.jpg)
 
 **Dashboard:**
 
-![Dashboard](C:\Users\alama\OneDrive\Pictures\school_bus_optmiser\Dashboar_without_button_click)
+![Dashboard](output/Dashboard_without_button_click.jpg)
 
 **Optimized Route Map:**
 
-![Optimized Route Map](C:\Users\alama\OneDrive\Pictures\school_bus_optmiser\Folium_map)
+![Optimized Route Map](output/Folium_map.jpg)
 
 ---
 
