@@ -1,9 +1,8 @@
 import tkinter as tk
 from tkinter import ttk , messagebox
 import mysql.connector
-from tkinterweb import HtmlFrame
 import folium
-from io import BytesIO
+import webbrowser
 
 # ---------- Database Connection ----------
 def get_connection():
@@ -120,13 +119,11 @@ def show_tables(table_name):
         cursor.close()
         db.close()
 
-# ---------- Inline Edit Function ----------
 def start_inline_edit(tree, rowid, col_index, table_name, columns, next_column=False):
-    """Inline edit for one cell and update DB"""
+    
     if col_index >= len(columns):
         return
 
-    # skip primary key (col 0)
     if col_index == 0:
         if next_column:
             return start_inline_edit(tree, rowid, 1, table_name, columns, next_column=True)
@@ -165,18 +162,15 @@ def start_inline_edit(tree, rowid, col_index, table_name, columns, next_column=F
         except Exception as e:
             print("DB update failed:", e)
 
-        # Continue to next column if requested
         if next_column and col_index + 1 < len(columns):
             tree.after(50, lambda: start_inline_edit(tree, rowid, col_index + 1, table_name, columns, True))
 
     entry.bind("<Return>", save_edit)
     entry.bind("<FocusOut>", save_edit)
 
-# ---------- Handle Buttons Function ----------
 def handle_action(action, tree, table_name, columns):
     sel = tree.selection()
 
-    # ---------- ADD ----------
     if action.startswith("Add"):
         try:
             db = get_connection()
@@ -186,16 +180,14 @@ def handle_action(action, tree, table_name, columns):
 
             insert_cols, insert_values = [], []
 
-            # --- Foreign key selection ---
             fk_values = {}
             for field, ftype, null, key, default, extra in col_info:
                 if "auto_increment" in extra.lower():
                     continue
                 insert_cols.append(field)
 
-                # Foreign key detection (column name ends with 'Id' or 'id')
                 if "int" in ftype.lower() and ("id" in field.lower()):
-                    # find parent table
+                    
                     ref_table_query = f"""
                     SELECT REFERENCED_TABLE_NAME 
                     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
@@ -205,10 +197,10 @@ def handle_action(action, tree, table_name, columns):
                     ref_table = cursor.fetchone()
                     if ref_table:
                         ref_table = ref_table[0]
-                        # fetch all IDs from parent table
+                        
                         cursor.execute(f"SELECT {field} FROM {ref_table}")
                         parent_ids = [str(r[0]) for r in cursor.fetchall()]
-                        # popup selection if parent_ids exist
+                        
                         if parent_ids:
                             sel_window = tk.Toplevel()
                             sel_window.title(f"Select {field} for {table_name}")
@@ -219,51 +211,41 @@ def handle_action(action, tree, table_name, columns):
                             dropdown = tk.OptionMenu(sel_window, var, *parent_ids)
                             dropdown.pack(pady=5)
 
-                            # Wait for user selection
                             sel_done = tk.BooleanVar()
                             tk.Button(sel_window, text="OK", command=lambda: sel_done.set(True)).pack(pady=5)
                             sel_window.wait_variable(sel_done)
                             insert_values.append(int(var.get()))
                             sel_window.destroy()
                         else:
-                            # no parent rows yet, insert NULL
                             insert_values.append(None)
                     else:
                         insert_values.append(None)
 
-                # ENUM type → pick first value
                 elif "enum" in ftype.lower():
                     first_val = ftype[ftype.find("(")+1:ftype.find(")")].split(",")[0].strip("'")
                     insert_values.append(first_val)
 
-                # INT → default 0
                 elif "int" in ftype.lower():
                     insert_values.append(0)
 
-                # VARCHAR / TEXT → empty string
                 else:
                     insert_values.append("")
 
-            # Insert into table
             placeholders = ", ".join(["%s"] * len(insert_values))
             cursor.execute(f"INSERT INTO {table_name} ({', '.join(insert_cols)}) VALUES ({placeholders})", insert_values)
             db.commit()
 
-            # Fetch new row for Treeview
             cursor.execute(f"SELECT * FROM {table_name} ORDER BY {col_info[0][0]} DESC LIMIT 1")
             new_row = cursor.fetchone()
             cursor.close()
             db.close()
 
-            # Add to Treeview and start inline edit
             new_id = tree.insert('', 'end', values=new_row)
             start_inline_edit(tree, new_id, 1, table_name, [c[0] for c in col_info], next_column=True)
 
         except Exception as e:
             print("Add failed:", e)
 
-
-    # ---------- EDIT ----------
     elif action.startswith("Edit"):
         if sel:
             row_id = sel[0]
@@ -271,7 +253,6 @@ def handle_action(action, tree, table_name, columns):
         else:
             messagebox.showwarning("Select row", "Please select a row to edit")
 
-    # ---------- DELETE / REMOVE ----------
     elif action.startswith("Delete") or action.startswith("Remove"):
         if sel:
             values = tree.item(sel[0], "values")
@@ -290,7 +271,6 @@ def handle_action(action, tree, table_name, columns):
         else:
             messagebox.showwarning("Select row", "Please select a row to delete")
 
-    # ---------- EXIT ----------
     elif action.startswith("Exit"):
         for widget in frame2.winfo_children():
             widget.destroy()
@@ -299,8 +279,31 @@ def handle_action(action, tree, table_name, columns):
 
     elif action == "Assign Route":
         messagebox.showinfo("Info", "Assign Route functionality is not yet implemented.")
+    elif action == "Optimize Route":
+        try:
+            db = get_connection()
+            cursor = db.cursor()
 
+            query = "Select Stp_name, Latitude, Longitude from Stop"
+            cursor.execute(query)
+            stops = cursor.fetchall()
+            cursor.close()
+            db.close()
 
+            if stops:
+                first_lat, first_lon = stops[0][1], stops[0][2]
+                m = folium.Map(location=[first_lat, first_lon], zoom_start=12)
+            else:
+                messagebox.showwarning("No Stops", "No stops available to optimize route.")
+                return
+            for name, lat, lon in stops:
+                folium.Marker(location=[lat, lon], popup=name, icon = folium.Icon(color='blue', icon='info-sign')).add_to(m)
+
+            m.save("optimized_route.html")
+            webbrowser.open("optimized_route.html")
+            
+        except Exception as e:
+            messagebox.showwarning("Optimize Route failed:", e)
 #----------- GUI Setup ----------
 def main():
     global root
