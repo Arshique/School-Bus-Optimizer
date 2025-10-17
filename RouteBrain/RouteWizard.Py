@@ -10,7 +10,7 @@ def get_connection():
     return mysql.connector.connect(
         host="localhost",
         user="root",
-        password="Bff=n&s<3",
+        password="Secure_School:)",
         database="RouteDb"
     )
 
@@ -401,4 +401,3 @@ def adm_dashboard(user):
     dashboard.mainloop()
 
 main()
-
